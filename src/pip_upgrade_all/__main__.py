@@ -8,6 +8,7 @@ as they would with a normal pip install invocation.
 from __future__ import annotations
 
 import argparse
+import signal
 import sys
 from importlib.metadata import distributions
 
@@ -65,13 +66,13 @@ def upgrade_all(
     dry_run: bool = False,
     skip: list[str] | None = None,
     user: bool = False,
+    with_deps: bool = False,
     index_url: str | None = None,
-    extra_args: list[str] | None = None,
     verbose: bool = False,
 ) -> int:
-    """Upgrade all installed packages.
+    """Upgrade all installed packages one by one.
 
-    Returns pip's exit code (0 = success).
+    Returns 0 if all succeeded, 1 if any failed.
     """
     skip_set = SYSTEM_PACKAGES | {s.lower().replace("-", "_") for s in (skip or [])}
     packages = _installed_packages(skip_set, pip_only=user)
@@ -80,30 +81,53 @@ def upgrade_all(
         print("No packages found to upgrade.", file=sys.stderr)
         return 0
 
-    cmd = ["install", "--upgrade", "--upgrade-strategy", "only-if-needed"]
-
+    base_cmd = ["install", "--upgrade"]
     if user:
-        cmd.append("--user")
+        base_cmd.append("--user")
+    if not with_deps:
+        base_cmd.append("--no-deps")
     if index_url:
-        cmd.extend(["--index-url", index_url])
+        base_cmd.extend(["--index-url", index_url])
     if not verbose:
-        cmd.append("-q")
-
-    cmd.extend(extra_args or [])
-    cmd.extend(packages)
+        base_cmd.append("-q")
 
     if dry_run:
         print("Would run:")
-        print("  pip", " ".join(cmd))
-        print(f"\n{len(packages)} package(s) would be upgraded:")
         for p in packages:
-            print(f"  {p}")
+            print(f"  pip {' '.join(base_cmd)} {p}")
         return 0
 
-    if verbose:
-        print(f"Upgrading {len(packages)} package(s)…")
+    failed: list[str] = []
+    total = len(packages)
 
-    return pip_main(cmd)
+    # Restore default SIGINT so Ctrl+C works even if pip swallows it
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
+    try:
+        for i, package in enumerate(packages, 1):
+            print(f"[{i}/{total}] {package}… ", end="", flush=True)
+            exit_code = pip_main(base_cmd + [package])
+            if exit_code == 0:
+                print("✓")
+            else:
+                print("✗ failed")
+                failed.append(package)
+    except KeyboardInterrupt:
+        print("\n\nAborted.")
+        if failed:
+            print(f"\n{len(failed)} package(s) failed before abort:")
+            for p in failed:
+                print(f"  • {p}")
+        return 1
+
+    if failed:
+        print(f"\n{len(failed)} package(s) failed to upgrade:")
+        for p in failed:
+            print(f"  • {p}")
+        return 1
+
+    print(f"\n✨ All {total} package(s) upgraded successfully.")
+    return 0
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -111,7 +135,8 @@ def main(argv: list[str] | None = None) -> None:
         prog="pip-upgrade-all",
         description=(
             "Upgrade every installed package to the latest release on PyPI.\n\n"
-            "Equivalent to: pip install -U <all installed packages>"
+            "Installs packages one by one with --no-deps by default.\n"
+            "Use --with-deps to enable full dependency resolution."
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -136,6 +161,11 @@ def main(argv: list[str] | None = None) -> None:
         ),
     )
     parser.add_argument(
+        "--with-deps",
+        action="store_true",
+        help="Enable full dependency resolution (slower, may cause conflicts).",
+    )
+    parser.add_argument(
         "--index-url", "-i",
         metavar="URL",
         help="Base URL of the Python Package Index (passed through to pip).",
@@ -151,15 +181,14 @@ def main(argv: list[str] | None = None) -> None:
         version=f"%(prog)s {_version()}",
     )
 
-    # Anything after '--' is forwarded verbatim to pip install
-    args, extra = parser.parse_known_args(argv)
+    args = parser.parse_args(argv)
 
     exit_code = upgrade_all(
         dry_run=args.dry_run,
         skip=args.skip,
         user=args.user,
+        with_deps=args.with_deps,
         index_url=args.index_url,
-        extra_args=extra or None,
         verbose=args.verbose,
     )
     sys.exit(exit_code)
