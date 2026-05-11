@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "upgrade-all"
+version = "0.1.1"
+description = "Upgrade every installed package to the latest PyPI release — the 'pip upgrade-all' command pip never shipped."
+readme = "README.md"
+license = { text = "GPL v3" }
+requires-python = ">=3.9"
+dependencies = [
+    "pip>=22.0",
+]
+keywords = ["pip", "upgrade", "update", "packages"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Installation/Setup",
+    "Topic :: System :: Systems Administration",
+]
+
+[project.scripts]
+upgrade-all = "pip_upgrade_all.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/yourname/pip-upgrade-all"
+Issues = "https://github.com/yourname/pip-upgrade-all/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pip_upgrade_all"]
