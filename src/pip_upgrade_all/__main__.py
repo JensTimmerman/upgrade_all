@@ -26,11 +26,18 @@ SYSTEM_PACKAGES = {
     "distro-info",
     "ubuntu-advantage-tools",
     "unattended-upgrades",
+    "pygobject",
+    "pycairo",
+    "dbus-python",
 }
 
 
-def _installed_packages(skip: set[str]) -> list[str]:
-    """Return the project names of every distribution in the current env."""
+def _installed_packages(skip: set[str], pip_only: bool = False) -> list[str]:
+    """Return the project names of every distribution in the current env.
+
+    If pip_only is True, only packages installed by pip are included,
+    skipping anything installed by the OS package manager (dnf, rpm, etc).
+    """
     seen: set[str] = set()
     names: list[str] = []
 
@@ -43,6 +50,10 @@ def _installed_packages(skip: set[str]) -> list[str]:
             continue
         if normalised in skip:
             continue
+        if pip_only:
+            installer = (dist.read_text("INSTALLER") or "").strip().lower()
+            if installer not in ("pip", ""):
+                continue
         seen.add(normalised)
         names.append(project_name)
 
@@ -63,13 +74,13 @@ def upgrade_all(
     Returns pip's exit code (0 = success).
     """
     skip_set = SYSTEM_PACKAGES | {s.lower().replace("-", "_") for s in (skip or [])}
-    packages = _installed_packages(skip_set)
+    packages = _installed_packages(skip_set, pip_only=user)
 
     if not packages:
         print("No packages found to upgrade.", file=sys.stderr)
         return 0
 
-    cmd = ["install", "--upgrade"]
+    cmd = ["install", "--upgrade", "--upgrade-strategy", "only-if-needed"]
 
     if user:
         cmd.append("--user")
@@ -119,7 +130,10 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument(
         "--user",
         action="store_true",
-        help="Install into the user site-packages directory (passes --user to pip).",
+        help=(
+            "Only upgrade packages installed by pip (not the OS package manager), "
+            "and install into the user site-packages directory."
+        ),
     )
     parser.add_argument(
         "--index-url", "-i",
