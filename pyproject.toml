@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "upgrade-all"
-version = "0.1.1"
+version = "0.1.2"
 description = "Upgrade every installed package to the latest PyPI release — the 'pip upgrade-all' command pip never shipped."
 readme = "README.md"
 license = { text = "GPL v3" }

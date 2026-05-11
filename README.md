@@ -77,6 +77,7 @@ that does exactly one thing.
   exclude them if needed.
 - System-managed Python environments (Homebrew, distro packages) may
   reject upgrades without `--user`.
+- There might be conflicts whre pip goes backgracking a long way, add `--upgrade-strategy eager` to be more aggressive or `only-if-needed` to be more conservative. e.g. `upgrade-all -- --upgrade-strategy eager`
 
 ## License
 

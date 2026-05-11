@@ -13,6 +13,21 @@ from importlib.metadata import distributions
 
 from pip._internal.cli.main import main as pip_main
 
+# Packages managed by the OS package manager that must never be upgraded via pip.
+SYSTEM_PACKAGES = {
+    "dnf",
+    "dnf-plugins-core",
+    "rpm",
+    "rpm-python",
+    "gpg",
+    "gpgme",
+    "apt",
+    "apt-pkg",
+    "distro-info",
+    "ubuntu-advantage-tools",
+    "unattended-upgrades",
+}
+
 
 def _installed_packages(skip: set[str]) -> list[str]:
     """Return the project names of every distribution in the current env."""
@@ -47,7 +62,7 @@ def upgrade_all(
 
     Returns pip's exit code (0 = success).
     """
-    skip_set = {s.lower().replace("-", "_") for s in (skip or [])}
+    skip_set = SYSTEM_PACKAGES | {s.lower().replace("-", "_") for s in (skip or [])}
     packages = _installed_packages(skip_set)
 
     if not packages:
